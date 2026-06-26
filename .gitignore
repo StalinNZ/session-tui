@@ -1,0 +1,8 @@
+session-tui.exe
+*.exe
+*.test
+*.out
+.vscode/
+.idea/
+__debug_bin
+dist/
