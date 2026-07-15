@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -18,11 +19,38 @@ const (
 	ModeRename
 )
 
+type SortMode int
+
+const (
+	SortTimeDesc SortMode = iota
+	SortTokensDesc
+	SortMsgsDesc
+	SortAgentAsc
+	SortTitleAsc
+)
+
+func (s SortMode) String() string {
+	switch s {
+	case SortTimeDesc:
+		return "time"
+	case SortTokensDesc:
+		return "tokens"
+	case SortMsgsDesc:
+		return "msgs"
+	case SortAgentAsc:
+		return "agent"
+	case SortTitleAsc:
+		return "name"
+	}
+	return "?"
+}
+
 type Model struct {
 	DB            *db.DB
 	Sessions      []db.Session
 	Cursor        int
 	Mode          Mode
+	SortMode      SortMode
 	FilterInput   textinput.Model
 	FilterText    string
 	ConfirmMsg    string
@@ -33,6 +61,37 @@ type Model struct {
 	Width         int
 	Height        int
 	Mem0Enabled   bool
+}
+
+// Sort sessions in place according to m.SortMode
+func (m *Model) SortSessions() {
+	sessions := m.Sessions
+	switch m.SortMode {
+	case SortTimeDesc:
+		sort.Slice(sessions, func(i, j int) bool {
+			return sessions[i].TimeUpdated > sessions[j].TimeUpdated
+		})
+	case SortTokensDesc:
+		sort.Slice(sessions, func(i, j int) bool {
+			return sessions[i].TotalTokens > sessions[j].TotalTokens
+		})
+	case SortMsgsDesc:
+		sort.Slice(sessions, func(i, j int) bool {
+			return sessions[i].MsgCount > sessions[j].MsgCount
+		})
+	case SortAgentAsc:
+		sort.Slice(sessions, func(i, j int) bool {
+			ai, aj := sessions[i].Agent, sessions[j].Agent
+			if ai == aj {
+				return sessions[i].TimeUpdated > sessions[j].TimeUpdated
+			}
+			return ai < aj
+		})
+	case SortTitleAsc:
+		sort.Slice(sessions, func(i, j int) bool {
+			return strings.ToLower(sessions[i].Title) < strings.ToLower(sessions[j].Title)
+		})
+	}
 }
 
 func NewModel(database *db.DB, mem0Enabled bool) (*Model, error) {
@@ -51,15 +110,18 @@ func NewModel(database *db.DB, mem0Enabled bool) (*Model, error) {
 	ri.CharLimit = 200
 	ri.Width = 60
 
-	return &Model{
+	m := &Model{
 		DB:          database,
 		Sessions:    sessions,
 		Cursor:      0,
 		Mode:        ModeBrowse,
+		SortMode:    SortTimeDesc,
 		FilterInput: fi,
 		RenameInput: ri,
 		Mem0Enabled: mem0Enabled,
-	}, nil
+	}
+	m.SortSessions()
+	return m, nil
 }
 
 func (m *Model) FilteredSessions() []db.Session {

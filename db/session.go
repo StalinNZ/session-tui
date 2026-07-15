@@ -10,18 +10,19 @@ import (
 )
 
 type Session struct {
-	ID           string `json:"id"`
-	Title        string `json:"title"`
-	Slug         string `json:"slug"`
-	MsgCount     int    `json:"msg_count"`
-	TokensInput  int64  `json:"tokens_input"`
-	TokensOutput int64  `json:"tokens_output"`
-	TotalTokens  int64  `json:"total_tokens"`
+	ID           string  `json:"id"`
+	Title        string  `json:"title"`
+	Slug         string  `json:"slug"`
+	Agent        string  `json:"agent"`
+	MsgCount     int     `json:"msg_count"`
+	TokensInput  int64   `json:"tokens_input"`
+	TokensOutput int64   `json:"tokens_output"`
+	TotalTokens  int64   `json:"total_tokens"`
 	Cost         float64 `json:"cost"`
-	TimeCreated  int64  `json:"time_created"`
-	TimeUpdated  int64  `json:"time_updated"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	TimeCreated  int64   `json:"time_created"`
+	TimeUpdated  int64   `json:"time_updated"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
 }
 
 type Stats struct {
@@ -55,85 +56,39 @@ func (d *DB) Path() string { return d.path }
 
 func (d *DB) ListSessions(limit, offset int) ([]Session, error) {
 	query := `
-		SELECT s.id, s.title, s.slug, s.time_created, s.time_updated,
+		SELECT s.id, s.title, s.slug, COALESCE(s.agent,''), s.time_created, s.time_updated,
 		       s.tokens_input, s.tokens_output, s.cost,
 		       (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as msg_count
 		FROM session s
 		WHERE s.title NOT LIKE '%@general%' AND s.title NOT LIKE '%subagent%'
 		ORDER BY s.time_updated DESC
 	`
-	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", limit)
-	}
-	if offset > 0 {
-		query += fmt.Sprintf(" OFFSET %d", offset)
-	}
-
-	rows, err := d.conn.Query(query)
-	if err != nil {
-		return nil, fmt.Errorf("list sessions: %w", err)
-	}
-	defer rows.Close()
-
-	var sessions []Session
-	for rows.Next() {
-		var s Session
-		if err := rows.Scan(&s.ID, &s.Title, &s.Slug, &s.TimeCreated, &s.TimeUpdated,
-			&s.TokensInput, &s.TokensOutput, &s.Cost, &s.MsgCount); err != nil {
-			return nil, fmt.Errorf("scan session: %w", err)
-		}
-		s.TotalTokens = s.TokensInput + s.TokensOutput
-		s.CreatedAt = tsToStr(s.TimeCreated)
-		s.UpdatedAt = tsToStr(s.TimeUpdated)
-		sessions = append(sessions, s)
-	}
-	return sessions, nil
+	return d.querySessions(query, nil, limit, offset)
 }
 
 func (d *DB) SearchSessions(q string, limit int) ([]Session, error) {
 	query := `
-		SELECT s.id, s.title, s.slug, s.time_created, s.time_updated,
+		SELECT s.id, s.title, s.slug, COALESCE(s.agent,''), s.time_created, s.time_updated,
 		       s.tokens_input, s.tokens_output, s.cost,
 		       (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as msg_count
 		FROM session s
 		WHERE s.title LIKE ? AND s.title NOT LIKE '%@general%' AND s.title NOT LIKE '%subagent%'
 		ORDER BY s.time_updated DESC
 	`
-	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", limit)
-	}
-
 	pattern := "%" + strings.ReplaceAll(q, " ", "%") + "%"
-	rows, err := d.conn.Query(query, pattern)
-	if err != nil {
-		return nil, fmt.Errorf("search sessions: %w", err)
-	}
-	defer rows.Close()
-
-	var sessions []Session
-	for rows.Next() {
-		var s Session
-		if err := rows.Scan(&s.ID, &s.Title, &s.Slug, &s.TimeCreated, &s.TimeUpdated,
-			&s.TokensInput, &s.TokensOutput, &s.Cost, &s.MsgCount); err != nil {
-			return nil, fmt.Errorf("scan session: %w", err)
-		}
-		s.TotalTokens = s.TokensInput + s.TokensOutput
-		s.CreatedAt = tsToStr(s.TimeCreated)
-		s.UpdatedAt = tsToStr(s.TimeUpdated)
-		sessions = append(sessions, s)
-	}
-	return sessions, nil
+	return d.querySessions(query, []any{pattern}, limit, 0)
 }
 
 func (d *DB) GetSession(id string) (*Session, error) {
 	query := `
-		SELECT s.id, s.title, s.slug, s.time_created, s.time_updated,
+		SELECT s.id, s.title, s.slug, COALESCE(s.agent,''), s.time_created, s.time_updated,
 		       s.tokens_input, s.tokens_output, s.cost,
 		       (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as msg_count
 		FROM session s WHERE s.id = ?
 	`
 	var s Session
-	err := d.conn.QueryRow(query, id).Scan(&s.ID, &s.Title, &s.Slug, &s.TimeCreated, &s.TimeUpdated,
+	err := d.conn.QueryRow(query, id).Scan(&s.ID, &s.Title, &s.Slug, &s.Agent,
+		&s.TimeCreated, &s.TimeUpdated,
 		&s.TokensInput, &s.TokensOutput, &s.Cost, &s.MsgCount)
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
@@ -142,6 +97,42 @@ func (d *DB) GetSession(id string) (*Session, error) {
 	s.CreatedAt = tsToStr(s.TimeCreated)
 	s.UpdatedAt = tsToStr(s.TimeUpdated)
 	return &s, nil
+}
+
+func (d *DB) querySessions(query string, args []any, limit, offset int) ([]Session, error) {
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+	if offset > 0 {
+		query += fmt.Sprintf(" OFFSET %d", offset)
+	}
+
+	var rows *sql.Rows
+	var err error
+	if len(args) > 0 {
+		rows, err = d.conn.Query(query, args...)
+	} else {
+		rows, err = d.conn.Query(query)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []Session
+	for rows.Next() {
+		var s Session
+		if err := rows.Scan(&s.ID, &s.Title, &s.Slug, &s.Agent,
+			&s.TimeCreated, &s.TimeUpdated,
+			&s.TokensInput, &s.TokensOutput, &s.Cost, &s.MsgCount); err != nil {
+			return nil, fmt.Errorf("scan session: %w", err)
+		}
+		s.TotalTokens = s.TokensInput + s.TokensOutput
+		s.CreatedAt = tsToStr(s.TimeCreated)
+		s.UpdatedAt = tsToStr(s.TimeUpdated)
+		sessions = append(sessions, s)
+	}
+	return sessions, nil
 }
 
 func (d *DB) DeleteSession(id string) error {

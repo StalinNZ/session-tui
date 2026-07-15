@@ -122,7 +122,7 @@ func runWithTUI(database *db.DB, cfg *config.Config) {
 	}()
 
 	// Start TUI
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseAllMotion())
 	go func() {
 		<-sigCh
 		cancel()
