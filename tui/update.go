@@ -248,6 +248,7 @@ func (m Model) handleBrowseMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.StatusMsg = fmt.Sprintf("Sort: %s", m.SortMode)
 		m.Cursor = 0
 		return m, nil
+
 	}
 
 	return m, nil

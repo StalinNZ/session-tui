@@ -6,3 +6,6 @@ session-tui.exe
 .idea/
 __debug_bin
 dist/
+
+*~
+*.bak

@@ -61,6 +61,7 @@ type Model struct {
 	Width         int
 	Height        int
 	Mem0Enabled   bool
+
 }
 
 // Sort sessions in place according to m.SortMode

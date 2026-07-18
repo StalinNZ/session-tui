@@ -14,22 +14,24 @@ var agentColor = map[string]lipgloss.Color{
 	"build":       lipgloss.Color("#FFAA00"),
 	"defender":    lipgloss.Color("#44DD44"),
 	"jelly-claw":  lipgloss.Color("#FF66FF"),
-	"manager":     lipgloss.Color("#FFFFFF"),
+	"manager":     lipgloss.Color("#88FF88"),
 	"session":     lipgloss.Color("#6688FF"),
 	"kuri-scout":  lipgloss.Color("#88AAAA"),
 	"recon":       lipgloss.Color("#888888"),
 }
 
 var agentIcon = map[string]string{
-	"kuri-osint":  "",
-	"kuri":        "󰹻",
-	"build":       "󰞷",
-	"defender":    "󰛡",
-	"jelly-claw":  "󰎁",
-	"manager":     "󰈸",
-	"session":     "",
-	"kuri-scout":  "󰓬",
-	"recon":       "󰛂",
+	"kuri-osint":       "󰗃",
+	"kuri":             "",
+	"build":            "󱥊",
+	"defender":         "󰒃",
+	"jelly-claw":       "󰕥",
+	"manager":          "",
+	"session":          "󰃤",
+	"kuri-scout":       "󰄱",
+	"Wall&Port-Manager":"󰒓",
+	"explore":          "󰈎",
+	"recon":            "󰈎",
 }
 
 var sortIcon = map[SortMode]string{
@@ -55,11 +57,15 @@ var (
 )
 
 func agentStyle(agent string) lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(agentColorStyle(agent)).Bold(true)
+}
+
+func agentColorStyle(agent string) lipgloss.Color {
 	c, ok := agentColor[agent]
 	if !ok {
-		c = lipgloss.Color("#AAAAAA")
+		return lipgloss.Color("#AAAAAA")
 	}
-	return lipgloss.NewStyle().Foreground(c).Bold(true)
+	return c
 }
 
 func (m Model) View() string {
@@ -86,8 +92,8 @@ func (m Model) View() string {
 		strings.Repeat(" ", padding),
 		styleMuted.Render(headerRight)))
 
-	sub := fmt.Sprintf(" %s %d sessions     total   s=sort  /=filter  d=delete  r=rename  R=refresh  q=quit",
-		sortIcon[m.SortMode], len(m.Sessions))
+	sub := fmt.Sprintf(" %s %s    %d sessions     s=sort  /=filter  d=delete  r=rename  R=refresh  q=quit",
+		sortIcon[m.SortMode], m.SortMode, len(m.Sessions))
 	b.WriteString(fmt.Sprintf("│%s│\n", styleMuted.Render(" "+truncate(sub, termW-3))))
 
 	b.WriteString(styleBorder.Render("├" + strings.Repeat("─", termW-2) + "┤") + "\n")
@@ -113,16 +119,42 @@ func (m Model) View() string {
 		}
 	}
 
-	// Column widths — responsive
-	agentW := 12
-	titleW := termW - agentW - 22 - 8 // remaining for title after agent/msgs/tokens/cursor
-	if titleW < 20 {
-		titleW = 20
-		agentW = termW - titleW - 22 - 8
-		if agentW < 6 {
-			agentW = 6
-		}
+	// Column widths — order: glype  agent  date  msgs  tokens  chat
+	cw := struct {
+		pre   int
+		icon  int
+		agent int
+		date  int
+		msgs  int
+		tok   int
+		title int
+	}{
+		pre:   1,
+		icon:  1,
+		agent: 11,
+		date:  14,
+		msgs:  5,
+		tok:   7,
 	}
+	// Fixed: cursor+space+glyph+space+sep+space+agent+space+sep+space+date+space+sep+space+msgs+space+sep+space+tokens+space+sep+space+title+space
+	fixed := 1 + 1 + 1 + 1 + 1 + 1 + cw.icon + 1 + 1 + 1 + cw.agent + 1 + 1 + 1 + cw.date + 1 + 1 + 1 + cw.msgs + 1 + 1 + 1 + cw.tok + 1
+	cw.title = termW - fixed - 2
+	if cw.title < 10 {
+		cw.title = 10
+	}
+
+	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#663399")).Render("")
+
+	// Header
+	hdr := fmt.Sprintf("│%*s %s %-*s %s %-*s %s %*s %s %*s %s %-*s │",
+		cw.pre, "glype", sep,
+		cw.agent, "agent", sep,
+		cw.date, "date", sep,
+		cw.msgs, "msgs", sep,
+		cw.tok, "tokens", sep,
+		cw.title, "chat")
+	b.WriteString(styleMuted.Render(hdr) + "\n")
+	b.WriteString(styleBorder.Render("├" + strings.Repeat("━", termW-2) + "┤") + "\n")
 
 	for i, s := range sessions {
 		if i < start || i >= end {
@@ -134,20 +166,26 @@ func (m Model) View() string {
 			cursorMark = styleCursor.Render("")
 		}
 
-		// Agent tag with color + icon
+		// Glype + agent
 		agent := s.Agent
 		if agent == "" {
 			agent = "?"
 		}
 		icon := agentIcon[agent]
 		if icon == "" {
-			icon = ""
+			icon = "󰄱"
 		}
-		agentTag := fmt.Sprintf("%s %s", icon, truncate(agent, agentW-2))
-		agentStyled := agentStyle(agent).Render(agentTag)
+		glyph := agentStyle(agent).Render(fmt.Sprintf("%-*s", cw.icon, icon))
+		agentName := truncate(agent, cw.agent)
+		if len([]rune(agentName)) < cw.agent {
+			agentName += strings.Repeat(" ", cw.agent-len([]rune(agentName)))
+		}
 
-		// Title
-		title := truncate(s.Title, titleW)
+		// Date
+		date := s.UpdatedAt
+
+		// Messages
+		msgsStr := fmt.Sprintf("%*d", cw.msgs, s.MsgCount)
 
 		// Tokens
 		tokens := fmt.Sprintf("%.1fM", float64(s.TotalTokens)/1_000_000)
@@ -157,14 +195,19 @@ func (m Model) View() string {
 				tokens = fmt.Sprintf("%d", s.TotalTokens)
 			}
 		}
+		tokStr := fmt.Sprintf("%*s", cw.tok, tokens)
 
-		line := fmt.Sprintf("│ %s %s %s %s %s %s │",
+		// Chat title (last, takes remaining space)
+		title := truncate(s.Title, cw.title)
+
+		line := fmt.Sprintf("│%s %s %s %s %s %s %s %s %s %s %s %s │",
 			cursorMark,
-			agentStyled,
-			title,
-			styleMsgs.Render(fmt.Sprintf("%3d", s.MsgCount)),
-			styleTokens.Render(fmt.Sprintf("󰘦%6s", tokens)),
-		)
+			glyph, sep,
+			agentStyle(agent).Render(agentName), sep,
+			styleMuted.Render(date), sep,
+			styleMsgs.Render(msgsStr), sep,
+			styleTokens.Render(tokStr), sep,
+			title)
 
 		if i == m.Cursor {
 			b.WriteString(styleSelected.Render(line) + "\n")
@@ -250,10 +293,28 @@ func truncate(s string, n int) string {
 }
 
 func displayWidth(s string) int {
-	// Approximate: count runes, treat CJK as 2
+	// Count runes, CJK as 2, but NOT NerdFont PUA (E000-F8FF) which is 1
 	w := 0
 	for _, r := range s {
-		if r > 0x2E80 && r < 0x30000 {
+		if r >= 0x1100 && r <= 0x11FF { // Hangul
+			w += 2
+		} else if r >= 0x2E80 && r <= 0x2FFF { // CJK Radicals
+			w += 2
+		} else if r >= 0x3000 && r <= 0x303F { // CJK Symbols
+			w += 2
+		} else if r >= 0x3040 && r <= 0x9FFF { // Hiragana-Katakana-CJK Unified
+			w += 2
+		} else if r >= 0xAC00 && r <= 0xD7AF { // Hangul Syllables
+			w += 2
+		} else if r >= 0xF900 && r <= 0xFAFF { // CJK Compatibility
+			w += 2
+		} else if r >= 0xFE30 && r <= 0xFE6F { // CJK Compat Forms
+			w += 2
+		} else if r >= 0xFF01 && r <= 0xFF60 { // Fullwidth forms
+			w += 2
+		} else if r >= 0xFFE0 && r <= 0xFFE6 { // Fullwidth signs
+			w += 2
+		} else if r >= 0x20000 && r <= 0x2FFFF { // CJK Ext B+
 			w += 2
 		} else {
 			w++
