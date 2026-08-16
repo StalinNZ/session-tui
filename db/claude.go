@@ -116,44 +116,7 @@ func ListClaudeJSONLSessions(root string) ([]Session, error) {
 	return sessions, nil
 }
 
-// ListOMPSessions - OmniRoute sessions (OmniRoute worktree .claude/projects)
-func ListOMPSessions() ([]Session, error) {
-	home, _ := os.UserHomeDir()
-	ompRoot := filepath.Join(home, ".claude", "projects", "C---A-UTU-LLMS-300000--A-LLM-MCP-set-OmniRoute")
-	return ListClaudeJSONLSessions(ompRoot)
-}
 
-// ListClaudeSessions - Claude Desktop sessions (non-worktree dirs)
-func ListClaudeSessions() ([]Session, error) {
-	home, _ := os.UserHomeDir()
-	claudeRoot := filepath.Join(home, ".claude", "projects")
-	var sessions []Session
-
-	entries, err := os.ReadDir(claudeRoot)
-	if err != nil {
-		return sessions, nil
-	}
-
-	for _, d := range entries {
-		if !d.IsDir() {
-			continue
-		}
-		// Skip worktree dirs (they have encoded paths like C--Users-Stalin-orca-workspaces-...)
-		name := d.Name()
-		if strings.Contains(name, "orca-workspaces") || strings.Contains(name, "A-UTU-LLMS") {
-			continue
-		}
-		// Parse sessions from this project
-		dirSessions, _ := ListClaudeJSONLSessions(filepath.Join(claudeRoot, name))
-		sessions = append(sessions, dirSessions...)
-	}
-	return sessions, nil
-}
-
-// ListHermesSessions - placeholder for Hermes
-func ListHermesSessions() ([]Session, error) {
-	return []Session{}, nil
-}
 
 // ListWorktreeSessions - all Orca worktree sessions as agent tabs
 func ListWorktreeSessions() (map[string][]Session, error) {
@@ -251,4 +214,62 @@ func cleanTitle(content string) string {
 		return line
 	}
 	return ""
+}
+func parseClaudeJSONL(path string) ([]Session, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var session Session
+	dec := json.NewDecoder(f)
+	var msgCount int
+	var firstTime, lastTime int64
+
+	for dec.More() {
+		var msg claudeMsg
+		if err := dec.Decode(&msg); err != nil {
+			continue
+		}
+		msgCount++
+		ts := parseTimestamp(msg.Timestamp)
+		if firstTime == 0 {
+			firstTime = ts
+		}
+		lastTime = ts
+
+		if session.Title == "" && msg.Type == "user" {
+			if m, ok := msg.Message.(map[string]interface{}); ok {
+				if content, ok := m["content"].(string); ok && content != "" {
+					content = cleanTitle(content)
+					if content != "" {
+						if len(content) > 60 {
+							session.Title = content[:60] + "…"
+						} else {
+							session.Title = content
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if session.Title == "" {
+		session.Title = "(no user message)"
+	}
+	if lastTime == 0 {
+		lastTime = firstTime
+	}
+	if lastTime == 0 {
+		lastTime = time.Now().UnixMilli()
+	}
+	session.MsgCount = msgCount
+	session.TimeCreated = firstTime
+	session.TimeUpdated = lastTime
+	session.TotalTokens = 0
+	session.CreatedAt = tsToStr(firstTime)
+	session.UpdatedAt = tsToStr(lastTime)
+
+	return []Session{session}, nil
 }

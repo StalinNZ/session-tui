@@ -30,15 +30,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		return m.handleMouseMsg(msg)
 
-	case sessionsUpdatedMsg:
+case sessionsUpdatedMsg:
 		sessions, err := m.DB.ListSessions(0, 0)
 		if err != nil {
 			m.StatusMsg = fmt.Sprintf("Error refreshing: %v", err)
 			return m, nil
 		}
-		m.OpenCodeSessions = sessions
-		if m.ActiveTab == TabOpenCode {
-			m.SortSessions()
+		m.AgentSessions[AgentOpenCode] = sessions
+		if m.ActiveTab >= 0 {
+			vis := m.VisibleAgents()
+			if m.ActiveTab < len(vis) && vis[m.ActiveTab].Type == AgentOpenCode {
+				m.SortSessions()
+			}
 		}
 		if m.Cursor >= len(m.FilteredSessions()) {
 			m.Cursor = 0
@@ -77,64 +80,28 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	x, y := msg.X, msg.Y
 
-	switch msg.Type {
+switch msg.Type {
 	case tea.MouseLeft:
 		// Tab bar click (y=1 = the tab row, 0-indexed within borders)
 		if y == 1 {
 			// Build tab list dynamically — same as View()
-			tabs := []struct {
-				mode TabMode
+			vis := m.VisibleAgents()
+			tabs := make([]struct {
+				name  string
 				width int
-			}{
-				{TabOpenCode, 0},
-				{TabAGY, 0},
-				{TabOMP, 0},
-				{TabClaude, 0},
-				{TabHermes, 0},
-			}
-			for range m.WorktreeAgents {
-				tabs = append(tabs, struct {
-					mode TabMode
+			}, len(vis))
+			for i, a := range vis {
+				lbl := fmt.Sprintf(" %d %s %s (%d) ", i+1, a.Glyph, a.Name, len(a.Sessions))
+				tabs[i] = struct {
+					name  string
 					width int
-				}{TabWorktree, 0})
-			}
-			ocLabel := fmt.Sprintf(" 1 %s OpenCode (%d) ", "󰈙", len(m.OpenCodeSessions))
-			tabs[0].width = displayWidth(ocLabel) + 4
-			agyLabel := fmt.Sprintf(" 2 %s AGY (%d) ", "󰛖", len(m.AGYSessions))
-			tabs[1].width = displayWidth(agyLabel) + 4
-			ompLabel := fmt.Sprintf(" 3 %s OMP (%d) ", "󰛖", len(m.OMPSessions))
-			tabs[2].width = displayWidth(ompLabel) + 4
-			claudeLabel := fmt.Sprintf(" 4 %s Claude (%d) ", "󰚩", len(m.ClaudeSessions))
-			tabs[3].width = displayWidth(claudeLabel) + 4
-			hermesLabel := fmt.Sprintf(" 5 %s Hermes (%d) ", "󰗃", len(m.HermesSessions))
-			tabs[4].width = displayWidth(hermesLabel) + 4
-			for i, wa := range m.WorktreeAgents {
-				lbl := fmt.Sprintf(" %d %s %s (%d) ", 6+i, wa.Glyph, wa.Name, len(wa.Sessions))
-				tabs[5+i].width = displayWidth(lbl) + 4
+				}{a.Name, displayWidth(lbl) + 4}
 			}
 			cx := 1
 			for i, tab := range tabs {
 				if x >= cx && x < cx+tab.width {
-					if tab.mode == TabWorktree {
-						idx := i - 5
-						m.SwitchWorktreeTab(idx)
-						m.StatusMsg = fmt.Sprintf("Tab: %s (%d sessions)", m.WorktreeAgents[idx].Name, len(m.WorktreeAgents[idx].Sessions))
-					} else {
-						m.SwitchTab(tab.mode)
-						switch tab.mode {
-						case TabOpenCode:
-							m.StatusMsg = fmt.Sprintf("Tab: OpenCode (%d sessions)", len(m.OpenCodeSessions))
-						case TabAGY:
-							m.ReloadAGY()
-							m.StatusMsg = fmt.Sprintf("Tab: AGY (%d conversations)", len(m.AGYSessions))
-						case TabOMP:
-							m.StatusMsg = fmt.Sprintf("Tab: OmniRoute (%d sessions)", len(m.OMPSessions))
-						case TabClaude:
-							m.StatusMsg = fmt.Sprintf("Tab: Claude (%d sessions)", len(m.ClaudeSessions))
-						case TabHermes:
-							m.StatusMsg = fmt.Sprintf("Tab: Hermes (%d sessions)", len(m.HermesSessions))
-						}
-					}
+					m.SwitchTab(i)
+					m.StatusMsg = fmt.Sprintf("Tab: %s (%d sessions)", tab.name, len(m.VisibleAgents()[i].Sessions))
 					return m, nil
 				}
 				cx += tab.width
@@ -190,7 +157,7 @@ func (m *Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				// Delete
 				sel := m.SelectedSession()
 				if sel != nil {
-					if m.ActiveTab == TabAGY {
+					if m.isAGY() {
 						m.ConfirmMsg = fmt.Sprintf("Delete AGY '%s' (%d steps)? (y/N)", sel.Title, sel.MsgCount)
 						id := sel.ID // capture
 						m.Mode = ModeConfirmDelete
@@ -217,7 +184,7 @@ func (m *Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 				}
 			} else if x >= 1+btnW*3 && x < 1+btnW*4 {
 				// Rename
-				if m.ActiveTab == TabAGY {
+				if m.isAGY() {
 					m.StatusMsg = "Cannot rename AGY conversations"
 					return m, nil
 				}
@@ -255,7 +222,14 @@ func (m *Model) handleMouseMsg(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleBrowseMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) isAGY() bool {
+	if m.ActiveTab >= 0 && m.ActiveTab < len(m.VisibleAgents()) {
+		return m.VisibleAgents()[m.ActiveTab].Type == AgentAntigravity
+	}
+	return false
+}
+
+func (m *Model) handleBrowseMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -292,7 +266,7 @@ func (m Model) handleBrowseMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if sel == nil {
 			return m, nil
 		}
-		if m.ActiveTab == TabAGY {
+		if m.isAGY() {
 			m.ConfirmMsg = fmt.Sprintf("Delete AGY '%s' (%d steps)? (y/N)", sel.Title, sel.MsgCount)
 			id := sel.ID // capture
 			m.Mode = ModeConfirmDelete
@@ -321,7 +295,7 @@ func (m Model) handleBrowseMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "r":
-		if m.ActiveTab == TabAGY {
+		if m.isAGY() {
 			m.StatusMsg = "Cannot rename AGY conversations"
 			return m, nil
 		}
@@ -339,49 +313,23 @@ func (m Model) handleBrowseMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refresh()
 		return m, nil
 
-	case "s":
+case "s":
 		m.SortMode = (m.SortMode + 1) % 5
 		m.SortSessions()
 		m.StatusMsg = fmt.Sprintf("Sort: %s", m.SortMode)
 		m.Cursor = 0
 		return m, nil
+	}
 
-	// Tab switching: 1=OC, 2=AGY, 3=OMP, 4=Claude, 5=Hermes, 6+=worktrees
-	case "1":
-		if m.ActiveTab != TabOpenCode {
-			m.SwitchTab(TabOpenCode)
-			m.StatusMsg = fmt.Sprintf("Tab: OpenCode (%d sessions)", len(m.OpenCodeSessions))
+	// Number keys 1-9 switch to visible tabs by index
+	vis := m.VisibleAgents()
+	if len(msg.String()) == 1 && msg.String()[0] >= '1' && msg.String()[0] <= '9' {
+		idx := int(msg.String()[0] - '1')
+		if idx < len(vis) {
+			m.SwitchTab(idx)
+			m.StatusMsg = fmt.Sprintf("Tab: %s (%d sessions)", vis[idx].Name, len(vis[idx].Sessions))
 		}
 		return m, nil
-
-	case "2":
-		if m.ActiveTab != TabAGY {
-			m.ReloadAGY()
-			m.SwitchTab(TabAGY)
-			m.StatusMsg = fmt.Sprintf("Tab: AGY (%d conversations)", len(m.AGYSessions))
-		}
-		return m, nil
-
-	case "3":
-		if m.ActiveTab != TabOMP {
-			m.SwitchTab(TabOMP)
-			m.StatusMsg = fmt.Sprintf("Tab: OmniRoute (%d sessions)", len(m.OMPSessions))
-		}
-		return m, nil
-
-	case "4":
-		if m.ActiveTab != TabClaude {
-			m.SwitchTab(TabClaude)
-			m.StatusMsg = fmt.Sprintf("Tab: Claude (%d sessions)", len(m.ClaudeSessions))
-		}
-		return m, nil
-
-	case "5":
-		if m.ActiveTab != TabHermes {
-			m.SwitchTab(TabHermes)
-			m.StatusMsg = fmt.Sprintf("Tab: Hermes (%d sessions)", len(m.HermesSessions))
-		}
-return m, nil
 	}
 
 	// Tab/Shift+Tab — cycle tabs forward/backward
@@ -445,4 +393,6 @@ var cmd tea.Cmd
 	m.RenameInput, cmd = m.RenameInput.Update(msg)
 	return m, cmd
 }
+
+
 

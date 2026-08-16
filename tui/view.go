@@ -183,25 +183,21 @@ func (m Model) View() string {
 	}
 
 	// ── Tab bar ──
+	vis := m.VisibleAgents()
 	tabs := []struct {
-		mode TabMode
-		name string
+		name  string
 		glyph string
 		count int
 	}{
-		{TabOpenCode, "OpenCode", "󰈙", len(m.OpenCodeSessions)},
-		{TabAGY, "AGY", "󰛖", len(m.AGYSessions)},
-		{TabOMP, "OMP", "󰛖", len(m.OMPSessions)},
-		{TabClaude, "Claude", "󰚩", len(m.ClaudeSessions)},
-		{TabHermes, "Hermes", "󰗃", len(m.HermesSessions)},
+		{name: "Nothing", glyph: "󱫟", count: 0},
 	}
-	for _, wa := range m.WorktreeAgents {
+	tabs = tabs[:0]
+	for _, a := range vis {
 		tabs = append(tabs, struct {
-			mode TabMode
-			name string
+			name  string
 			glyph string
 			count int
-		}{TabWorktree, wa.Name, wa.Glyph, len(wa.Sessions)})
+		}{a.Name, a.Glyph, len(a.Sessions)})
 	}
 
 	b.WriteString(styleBorder.Render("╭" + strings.Repeat("─", termW-2) + "╮") + "\n")
@@ -211,7 +207,7 @@ func (m Model) View() string {
 	for i, tab := range tabs {
 		num := i + 1
 		label := fmt.Sprintf(" %d %s %s (%d) ", num, tab.glyph, tab.name, tab.count)
-		if m.ActiveTab == tab.mode && (tab.mode != TabWorktree || m.WorktreeIdx == i-5) {
+		if m.ActiveTab == i {
 			b.WriteString(tabActive.Render(label))
 		} else {
 			b.WriteString(tabInactive.Render(label))
@@ -247,7 +243,7 @@ func (m Model) View() string {
 		strings.Repeat(" ", padding),
 		styleMuted.Render(headerRight)))
 
-	sub := fmt.Sprintf(" %s %s    %d sessions     s=sort  /=filter  d=delete  r=rename  R=refresh  q=quit  1=OC  2=AGY  3=OMP  4=Claude  5=Hermes  6+=agents",
+	sub := fmt.Sprintf(" %s %s    %d sessions     s=sort  /=filter  d=delete  r=rename  R=refresh  q=quit  Tab=cycle",
 		sortIcon[m.SortMode], m.SortMode, len(m.FilteredSessions()))
 	b.WriteString(fmt.Sprintf("│%s│\n", styleMuted.Render(" "+truncate(sub, termW-3))))
 
@@ -393,7 +389,7 @@ func (m Model) View() string {
 		var empty string
 		if m.FilterText != "" {
 			empty = " 󰱟 No sessions match filter"
-		} else if m.ActiveTab == TabAGY {
+		} else if m.isAGY() {
 			empty = " 󰱟 No AGY conversations found"
 		} else {
 			empty = " 󰱟 No sessions"
