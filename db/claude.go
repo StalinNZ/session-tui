@@ -76,11 +76,13 @@ func ListClaudeJSONLSessions(root string) ([]Session, error) {
 			if title == "" && msg.Type == "user" {
 				if m, ok := msg.Message.(map[string]interface{}); ok {
 					if content, ok := m["content"].(string); ok && content != "" {
-						// Truncate to 60 chars
-						if len(content) > 60 {
-							title = content[:60] + "…"
-						} else {
-							title = content
+						content = cleanTitle(content)
+						if content != "" {
+							if len(content) > 60 {
+								title = content[:60] + "…"
+							} else {
+								title = content
+							}
 						}
 					}
 				}
@@ -190,12 +192,63 @@ func ListWorktreeSessions() (map[string][]Session, error) {
 func decodeDirName(encoded string) string {
 	// C--Users-Stalin-orca-workspaces-OmniRoute-browsermcp-auth-claude -> browsermcp-auth-claude
 	// C---A-UTU-LLMS-300000--A-LLM-MCP-set-OmniRoute -> OmniRoute
+	if strings.Contains(encoded, "orca-workspaces") {
+		idx := strings.Index(encoded, "orca-workspaces")
+		if idx >= 0 {
+			return encoded[idx+len("orca-workspaces-"):]
+		}
+	}
+	if strings.Contains(encoded, "A-UTU-LLMS") {
+		idx := strings.Index(encoded, "A-UTU-LLMS")
+		if idx >= 0 {
+			// Find the last segment after the encoded path
+			suffix := encoded[idx:]
+			parts := strings.Split(suffix, "-")
+			if len(parts) > 2 {
+				return strings.Join(parts[2:], "-")
+			}
+			return suffix
+		}
+	}
+	// Fallback: take last meaningful segment
 	parts := strings.Split(encoded, "-")
-	// Find last meaningful segment
 	for i := len(parts) - 1; i >= 0; i-- {
 		if parts[i] != "Users" && parts[i] != "Stalin" && parts[i] != "C" && parts[i] != "" {
 			return strings.Join(parts[i:], "-")
 		}
 	}
 	return encoded
+}
+
+// cleanTitle strips Orca dispatch preambles and returns first meaningful line
+func cleanTitle(content string) string {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Skip Orca dispatch preamble
+		if strings.HasPrefix(line, "You are working inside Orca") {
+			continue
+		}
+		if strings.HasPrefix(line, "Your coordinator's terminal handle is:") {
+			continue
+		}
+		if strings.HasPrefix(line, "Your task ID is:") {
+			continue
+		}
+		if strings.HasPrefix(line, "=== CLI COMMANDS ===") {
+			continue
+		}
+		if strings.HasPrefix(line, "# ") {
+			continue
+		}
+		// Skip very long lines (likely dump)
+		if len(line) > 200 {
+			continue
+		}
+		return line
+	}
+	return ""
 }

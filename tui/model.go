@@ -364,6 +364,36 @@ func (m *Model) SwitchWorktreeTab(idx int) {
 	m.SortSessions()
 }
 
+// cycleTab moves forward/backward through all tabs (5 fixed + N worktree tabs)
+func (m *Model) cycleTab(forward bool) {
+	total := 5 + len(m.WorktreeAgents)
+	if total == 0 {
+		return
+	}
+	cur := int(m.ActiveTab)
+	if forward {
+		cur = (cur + 1) % total
+	} else {
+		cur = (cur - 1 + total) % total
+	}
+	switch cur {
+	case 0:
+		m.SwitchTab(TabOpenCode)
+	case 1:
+		m.ReloadAGY()
+		m.SwitchTab(TabAGY)
+	case 2:
+		m.SwitchTab(TabOMP)
+	case 3:
+		m.SwitchTab(TabClaude)
+	case 4:
+		m.SwitchTab(TabHermes)
+	default:
+		m.SwitchWorktreeTab(cur - 5)
+	}
+	m.StatusMsg = fmt.Sprintf("Tab: %s (%d sessions)", m.ActiveTab, len(m.CurrentSessions()))
+}
+
 func (m *Model) refresh() {
 	switch m.ActiveTab {
 	case TabOpenCode:
