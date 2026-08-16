@@ -104,7 +104,17 @@ Add to your `opencode.json`:
 | `d` | Delete selected session (with confirmation) |
 | `r` | Rename selected session |
 | `R` | Refresh from database |
+| `s` | Cycle sort mode (time/tokens/msgs/agent/name) |
+| `1` | OpenCode tab |
+| `2` | AGY (Antigravity) tab |
+| `3` | OMP (OmniRoute) tab |
+| `4` | Claude (Desktop) tab |
+| `5` | Hermes tab |
+| `6`–`9` | Worktree agent tabs 1–4 |
+| `Tab` / `Shift+Tab` | Cycle all tabs forward/back |
 | `q` / `Ctrl+C` | Quit |
+
+Click: tabs (switch), rows (select), buttons (Sort/Filter/Delete/Rename/Refresh/Quit)
 
 ## Optional: Mem0
 

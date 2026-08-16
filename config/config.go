@@ -18,7 +18,7 @@ func Load() (*Config, error) {
 	cfg := &Config{}
 
 	flag.IntVar(&cfg.Port, "port", 8300, "MCP SSE server port")
-	flag.StringVar(&cfg.DBPath, "db", "", "Path to opencode-dev.db (auto-detects if empty)")
+	flag.StringVar(&cfg.DBPath, "db", "", "Path to opencode.db (auto-detects if empty)")
 	flag.StringVar(&cfg.Mem0URL, "mem0-url", "", "Mem0 MCP server URL (optional, e.g. http://127.0.0.1:8301/sse)")
 	flag.BoolVar(&cfg.Headless, "headless", false, "Run MCP server only (no TUI)")
 	flag.Parse()
@@ -41,8 +41,8 @@ func Load() (*Config, error) {
 	if cfg.DBPath == "" {
 		home, _ := os.UserHomeDir()
 		candidates := []string{
-			filepath.Join(home, ".local", "share", "opencode", "opencode-dev.db"),
 			filepath.Join(home, ".local", "share", "opencode", "opencode.db"),
+			filepath.Join(home, ".local", "share", "opencode", "opencode-dev.db"),
 		}
 		for _, p := range candidates {
 			if _, err := os.Stat(p); err == nil {

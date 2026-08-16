@@ -45,6 +45,15 @@ func Open(path string) (*DB, error) {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 	conn.SetMaxOpenConns(1)
+	conn.SetMaxIdleConns(5)
+	conn.SetConnMaxLifetime(time.Hour)
+
+	conn.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_session_updated ON session(time_updated DESC);
+		CREATE INDEX IF NOT EXISTS idx_session_title ON session(title);
+		CREATE INDEX IF NOT EXISTS idx_message_session_id ON message(session_id);
+	`)
+
 	return &DB{conn: conn, path: path}, nil
 }
 
@@ -58,8 +67,13 @@ func (d *DB) ListSessions(limit, offset int) ([]Session, error) {
 	query := `
 		SELECT s.id, s.title, s.slug, COALESCE(s.agent,''), s.time_created, s.time_updated,
 		       s.tokens_input, s.tokens_output, s.cost,
-		       (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as msg_count
+		       COALESCE(m.msg_count, 0)
 		FROM session s
+		LEFT JOIN (
+			SELECT session_id, COUNT(*) as msg_count
+			FROM message
+			GROUP BY session_id
+		) m ON s.id = m.session_id
 		WHERE s.title NOT LIKE '%@general%' AND s.title NOT LIKE '%subagent%'
 		ORDER BY s.time_updated DESC
 	`
@@ -70,8 +84,13 @@ func (d *DB) SearchSessions(q string, limit int) ([]Session, error) {
 	query := `
 		SELECT s.id, s.title, s.slug, COALESCE(s.agent,''), s.time_created, s.time_updated,
 		       s.tokens_input, s.tokens_output, s.cost,
-		       (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as msg_count
+		       COALESCE(m.msg_count, 0)
 		FROM session s
+		LEFT JOIN (
+			SELECT session_id, COUNT(*) as msg_count
+			FROM message
+			GROUP BY session_id
+		) m ON s.id = m.session_id
 		WHERE s.title LIKE ? AND s.title NOT LIKE '%@general%' AND s.title NOT LIKE '%subagent%'
 		ORDER BY s.time_updated DESC
 	`
