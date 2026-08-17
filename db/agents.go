@@ -64,6 +64,32 @@ func ListAntigravitySessions(home string) ([]Session, error) {
 	return []Session{}, nil
 }
 
+// Stubs for non-installed agents - return empty to hide tabs
+func ListCodexSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListGrokSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListCopilotSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListMiMoCodeSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListAmpSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListOpenClaudeSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListPiSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListOhMyPiSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListHermesAgentSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListDevinSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListGooseSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListAuggieSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListAutohandCodeSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListCharmSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListClineSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListCodebuffSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListCommandCodeSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListContinueSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListDroidSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListKilocodeSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListKimiCodingSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListMistralVibeSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListQwenCodeSessions(home string) ([]Session, error) { return []Session{}, nil }
+func ListRovoDevSessions(home string) ([]Session, error) { return []Session{}, nil }
+
 func ListCursorJSONLSessions(root string) ([]Session, error) {
 	var sessions []Session
 	if _, err := os.Stat(root); os.IsNotExist(err) {
@@ -90,5 +116,3 @@ func ListKimiJSONLSessions(root string) ([]Session, error) {
 func ListKiroJSONLSessions(root string) ([]Session, error) {
 	return []Session{}, nil
 }
-
-

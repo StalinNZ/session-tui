@@ -48,26 +48,20 @@ func (s SortMode) String() string {
 	return "?"
 }
 
-// All Orca-supported agents with their session loaders
+// All 29 Orca-supported agents
 type AgentType int
 
 const (
-	// Installed on your system
-	AgentOpenCode AgentType = iota
-	AgentClaudeCode
-	AgentCursor
-	AgentHermes
-	AgentKimi
-	AgentKiro
-	AgentAntigravity
-
-	// Not installed but supported
+	AgentClaudeCode AgentType = iota
 	AgentCodex
 	AgentGrok
+	AgentCursor
 	AgentCopilot
+	AgentOpenCode
 	AgentMiMoCode
 	AgentAmp
 	AgentOpenClaude
+	AgentAntigravity
 	AgentPi
 	AgentOhMyPi
 	AgentHermesAgent
@@ -82,7 +76,8 @@ const (
 	AgentContinue
 	AgentDroid
 	AgentKilocode
-	AgentKimiCoding
+	AgentKimi
+	AgentKiro
 	AgentMistralVibe
 	AgentQwenCode
 	AgentRovoDev
@@ -94,61 +89,48 @@ var AllAgents = []struct {
 	Glyph string
 	Load  func(home string) ([]db.Session, error)
 }{
-	// Your installed agents (first, higher priority)
-	{AgentOpenCode, "OpenCode", "󰈙", db.ListOpenCodeSessions},
 	{AgentClaudeCode, "Claude Code", "󰚩", db.ListClaudeCodeSessions},
+	{AgentCodex, "Codex", "󱃔", db.ListCodexSessions},
+	{AgentGrok, "Grok", "󰩓", db.ListGrokSessions},
 	{AgentCursor, "Cursor", "󰓬", db.ListCursorSessions},
-	{AgentHermes, "Hermes", "󰗃", db.ListHermesSessions},
+	{AgentCopilot, "GitHub Copilot", "", db.ListCopilotSessions},
+	{AgentOpenCode, "OpenCode", "󰈙", db.ListOpenCodeSessions},
+	{AgentMiMoCode, "MiMo Code", "󰒊", db.ListMiMoCodeSessions},
+	{AgentAmp, "Amp", "󰒼", db.ListAmpSessions},
+	{AgentOpenClaude, "OpenClaude", "󰚩", db.ListOpenClaudeSessions},
+	{AgentAntigravity, "Antigravity", "󰛖", db.ListAntigravitySessions},
+	{AgentPi, "Pi", "󰗇", db.ListPiSessions},
+	{AgentOhMyPi, "oh-my-pi", "󰍡", db.ListOhMyPiSessions},
+	{AgentHermesAgent, "Hermes Agent", "󰗃", db.ListHermesSessions},
+	{AgentDevin, "Devin", "󰌠", db.ListDevinSessions},
+	{AgentGoose, "Goose", "󰭹", db.ListGooseSessions},
+	{AgentAuggie, "Auggie", "󰰹", db.ListAuggieSessions},
+	{AgentAutohandCode, "Autohand Code", "󰗧", db.ListAutohandCodeSessions},
+	{AgentCharm, "Charm", "󰴹", db.ListCharmSessions},
+	{AgentCline, "Cline", "󰄱", db.ListClineSessions},
+	{AgentCodebuff, "Codebuff", "󰲂", db.ListCodebuffSessions},
+	{AgentCommandCode, "Command Code", "󰗧", db.ListCommandCodeSessions},
+	{AgentContinue, "Continue", "󰒝", db.ListContinueSessions},
+	{AgentDroid, "Droid", "󰀐", db.ListDroidSessions},
+	{AgentKilocode, "Kilocode", "󰥔", db.ListKilocodeSessions},
 	{AgentKimi, "Kimi", "󰷚", db.ListKimiSessions},
 	{AgentKiro, "Kiro", "󰀄", db.ListKiroSessions},
-	{AgentAntigravity, "Antigravity", "󰛖", db.ListAntigravitySessions},
-
-	// Not installed but supported
-	{AgentCodex, "Codex", "󱃔", nil},
-	{AgentGrok, "Grok", "󰩓", nil},
-	{AgentCopilot, "GitHub Copilot", "", nil},
-	{AgentMiMoCode, "MiMo Code", "󰒊", nil},
-	{AgentAmp, "Amp", "󰒼", nil},
-	{AgentOpenClaude, "OpenClaude", "󰚩", nil},
-	{AgentPi, "Pi", "󰗇", nil},
-	{AgentOhMyPi, "oh-my-pi", "󰍡", nil},
-	{AgentHermesAgent, "Hermes Agent", "󰗃", nil},
-	{AgentDevin, "Devin", "󰌠", nil},
-	{AgentGoose, "Goose", "󰭹", nil},
-	{AgentAuggie, "Auggie", "󰰹", nil},
-	{AgentAutohandCode, "Autohand Code", "󰗧", nil},
-	{AgentCharm, "Charm", "󰴹", nil},
-	{AgentCline, "Cline", "󰄱", nil},
-	{AgentCodebuff, "Codebuff", "󰲂", nil},
-	{AgentCommandCode, "Command Code", "󰗧", nil},
-	{AgentContinue, "Continue", "󰒝", nil},
-	{AgentDroid, "Droid", "󰀐", nil},
-	{AgentKilocode, "Kilocode", "󰥔", nil},
-	{AgentKimiCoding, "Kimi Coding", "󰷚", nil},
-	{AgentKiro, "Kiro", "󰀄", nil},
-	{AgentMistralVibe, "Mistral Vibe", "󰾀", nil},
-	{AgentQwenCode, "Qwen Code", "󰛔", nil},
-	{AgentRovoDev, "Rovo Dev", "󰐱", nil},
+	{AgentMistralVibe, "Mistral Vibe", "󰾀", db.ListMistralVibeSessions},
+	{AgentQwenCode, "Qwen Code", "󰛔", db.ListQwenCodeSessions},
+	{AgentRovoDev, "Rovo Dev", "󰐱", db.ListRovoDevSessions},
 }
 
-// DynamicAgent holds sessions for a tab (either fixed agent or worktree)
 type DynamicAgent struct {
-	Type      AgentType
-	Name      string
-	Glyph     string
-	Sessions  []db.Session
-	Worktree  bool // true if this is a worktree tab
+	Type     AgentType
+	Name     string
+	Glyph    string
+	Sessions []db.Session
 }
 
 type Model struct {
 	DB *db.DB
 
-	// Agent sessions (populated on demand)
 	AgentSessions map[AgentType][]db.Session
-
-	// Dynamic worktree tabs
-	WorktreeAgents []DynamicAgent
-	WorktreeIdx    int // index into WorktreeAgents for the active worktree tab
 
 	Cursor        int
 	Mode          Mode
@@ -165,18 +147,21 @@ type Model struct {
 	Height        int
 	Mem0Enabled   bool
 
-	// AGY data source paths
 	AGYDBPath     string
 	AGYHistoryPath string
 }
 
-// VisibleAgents returns only worktree agents that have sessions
 func (m *Model) VisibleAgents() []DynamicAgent {
 	var visible []DynamicAgent
-	// Only worktree agents
-	for _, wa := range m.WorktreeAgents {
-		if len(wa.Sessions) > 0 {
-			visible = append(visible, wa)
+	for _, a := range AllAgents {
+		sessions := m.AgentSessions[a.Type]
+		if len(sessions) > 0 {
+			visible = append(visible, DynamicAgent{
+				Type:     a.Type,
+				Name:     a.Name,
+				Glyph:    a.Glyph,
+				Sessions: sessions,
+			})
 		}
 	}
 	return visible
@@ -190,31 +175,12 @@ func (m *Model) CurrentSessions() []db.Session {
 	return nil
 }
 
-func (m *Model) ActiveAgent() *DynamicAgent {
-	vis := m.VisibleAgents()
-	if m.ActiveTab >= 0 && m.ActiveTab < len(vis) {
-		return &vis[m.ActiveTab]
-	}
-	return nil
-}
-
 func (m *Model) SetCurrentSessions(sessions []db.Session) {
 	vis := m.VisibleAgents()
 	if m.ActiveTab < 0 || m.ActiveTab >= len(vis) {
 		return
 	}
-	a := vis[m.ActiveTab]
-	if a.Worktree {
-		// Find the matching worktree agent and update its sessions
-		for i := range m.WorktreeAgents {
-			if m.WorktreeAgents[i].Name == a.Name {
-				m.WorktreeAgents[i].Sessions = sessions
-				break
-			}
-		}
-	} else {
-		m.AgentSessions[a.Type] = sessions
-	}
+	m.AgentSessions[vis[m.ActiveTab].Type] = sessions
 }
 
 func (m *Model) SortSessions() {
@@ -254,32 +220,27 @@ func (m *Model) SortSessions() {
 func NewModel(database *db.DB, mem0Enabled bool) (*Model, error) {
 	home, _ := os.UserHomeDir()
 
-	// Load AGY conversations (best-effort, non-fatal)
 	agyDBPath := filepath.Join(home, ".gemini", "antigravity-cli", "conversation_summaries.db")
 	agyHistoryPath := filepath.Join(home, ".gemini", "antigravity-cli", "history.jsonl")
+
 	agySessions, _ := db.ListAGYConversations(agyDBPath, agyHistoryPath)
 	if agySessions == nil {
 		agySessions = []db.Session{}
 	}
 
-	// Load Orca worktree sessions
-	worktreeMap, _ := db.ListWorktreeSessions()
-	var worktreeAgents []DynamicAgent
-	for name, sess := range worktreeMap {
-		sort.Slice(sess, func(i, j int) bool {
-			return sess[i].TimeUpdated > sess[j].TimeUpdated
-		})
-		worktreeAgents = append(worktreeAgents, DynamicAgent{
-			Type:      AgentOpenCode, // placeholder type
-			Name:      name,
-			Glyph:     "󰄱",
-			Sessions:  sess,
-			Worktree:  true,
-		})
+	agentSessions := make(map[AgentType][]db.Session)
+	for _, a := range AllAgents {
+		if a.Load != nil {
+			sessions, _ := a.Load(home)
+			if sessions == nil {
+				sessions = []db.Session{}
+			}
+			agentSessions[a.Type] = sessions
+		} else {
+			agentSessions[a.Type] = []db.Session{}
+		}
 	}
-	sort.Slice(worktreeAgents, func(i, j int) bool {
-		return worktreeAgents[i].Name < worktreeAgents[j].Name
-	})
+	agentSessions[AgentAntigravity] = agySessions
 
 	fi := textinput.New()
 	fi.Placeholder = "filter sessions..."
@@ -293,7 +254,7 @@ func NewModel(database *db.DB, mem0Enabled bool) (*Model, error) {
 
 	m := &Model{
 		DB:             database,
-		WorktreeAgents: worktreeAgents,
+		AgentSessions:  agentSessions,
 		Cursor:         0,
 		Mode:           ModeBrowse,
 		SortMode:       SortTimeDesc,
@@ -353,7 +314,6 @@ func (m *Model) ReloadAGY() {
 	}
 }
 
-// Switch to an agent by its index in visible agents
 func (m *Model) SwitchTab(agentIdx int) {
 	if agentIdx >= 0 && agentIdx < len(m.VisibleAgents()) {
 		m.ActiveTab = agentIdx
@@ -364,32 +324,6 @@ func (m *Model) SwitchTab(agentIdx int) {
 	}
 }
 
-func (m *Model) SwitchWorktreeTab(idx int) {
-	if idx >= 0 && idx < len(m.WorktreeAgents) {
-		m.ActiveTab = -1 // determined by worktree selection
-		m.WorktreeIdx = idx
-		m.Cursor = 0
-		m.FilterText = ""
-		m.FilterInput.SetValue("")
-		m.ActiveTab = m.worktreeTabIndex(idx)
-		m.SortSessions()
-	}
-}
-
-// worktreeTabIndex returns the index in VisibleAgents() for worktree idx
-func (m *Model) worktreeTabIndex(idx int) int {
-	vis := m.VisibleAgents()
-	start := 0
-	for i, v := range vis {
-		if v.Worktree {
-			start = i
-			break
-		}
-	}
-	return start + idx
-}
-
-// cycleTab moves forward/backward through all VISIBLE tabs
 func (m *Model) cycleTab(forward bool) {
 	vis := m.VisibleAgents()
 	if len(vis) == 0 {
@@ -419,24 +353,6 @@ func (m *Model) refresh() {
 			m.AgentSessions[a.Type] = sessions
 		}
 	}
-	// Refresh worktrees
-	worktreeMap, _ := db.ListWorktreeSessions()
-	m.WorktreeAgents = nil
-	for name, sess := range worktreeMap {
-		sort.Slice(sess, func(i, j int) bool {
-			return sess[i].TimeUpdated > sess[j].TimeUpdated
-		})
-		m.WorktreeAgents = append(m.WorktreeAgents, DynamicAgent{
-			Type:      AgentOpenCode,
-			Name:      name,
-			Glyph:     "󰄱",
-			Sessions:  sess,
-			Worktree:  true,
-		})
-	}
-	sort.Slice(m.WorktreeAgents, func(i, j int) bool {
-		return m.WorktreeAgents[i].Name < m.WorktreeAgents[j].Name
-	})
 	m.SortSessions()
 	m.Cursor = 0
 }
