@@ -73,6 +73,37 @@ Add to your `opencode.json`:
 }
 ```
 
+## Auto-Discover Agent Tabs
+
+session-tui automatically discovers and loads sessions from **all Orca-supported agents** on your system. Tabs only appear when an agent has active sessions — no manual config needed.
+
+### Supported Agents (auto-detected)
+| Agent | Binary | Session Source |
+|-------|--------|----------------|
+| OpenCode | `opencode` | `~/.local/share/opencode/opencode.db` |
+| Claude Code | `claude` | `~/.claude/projects/*.jsonl` |
+| Cursor | `cursor` | `~/.cursor/workspaceStorage/*.jsonl` |
+| Hermes | `hermes` | `~/.hermes/config.yaml` |
+| Kimi | `kimi` | `~/.kimi-code/sessions/*.jsonl` |
+| Kiro | `kiro` | `~/.kiro/sessions/*.jsonl` |
+| Antigravity | `gemini` (Antigravity CLI) | `~/.gemini/antigravity-cli/conversation_summaries.db` |
+
+**Not installed agents** (Codex, Grok, Copilot, Devin, Goose, Cline, etc.) are defined but hidden until sessions exist.
+
+### Orca Worktree Sessions
+Every Orca worktree under `~/.claude/projects/*orca-workspaces-*` is auto-discovered as a tab:
+- `browsermcp-auth-claude`
+- `mesh-claude-kimi`
+- `omni-env-config`
+- `omni-gemini-config`
+- `omni-perf-fixes`
+- `omni-port-config`
+- `omni-hermes`
+- `OmniRoute-worker`
+- ...and any future worktrees
+
+Tabs are created dynamically — no config needed.
+
 ## MCP Protocol
 
 ### Resources (with subscription support)
@@ -105,12 +136,7 @@ Add to your `opencode.json`:
 | `r` | Rename selected session |
 | `R` | Refresh from database |
 | `s` | Cycle sort mode (time/tokens/msgs/agent/name) |
-| `1` | OpenCode tab |
-| `2` | AGY (Antigravity) tab |
-| `3` | OMP (OmniRoute) tab |
-| `4` | Claude (Desktop) tab |
-| `5` | Hermes tab |
-| `6`–`9` | Worktree agent tabs 1–4 |
+| `1`–`9` | Jump to tab by position |
 | `Tab` / `Shift+Tab` | Cycle all tabs forward/back |
 | `q` / `Ctrl+C` | Quit |
 
