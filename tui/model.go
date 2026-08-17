@@ -170,22 +170,10 @@ type Model struct {
 	AGYHistoryPath string
 }
 
-// VisibleAgents returns only agents that have sessions or are worktrees
+// VisibleAgents returns only worktree agents that have sessions
 func (m *Model) VisibleAgents() []DynamicAgent {
 	var visible []DynamicAgent
-	for _, a := range AllAgents {
-		sessions := m.AgentSessions[a.Type]
-		if len(sessions) > 0 {
-			visible = append(visible, DynamicAgent{
-				Type:     a.Type,
-				Name:     a.Name,
-				Glyph:    a.Glyph,
-				Sessions: sessions,
-				Worktree: false,
-			})
-		}
-	}
-	// Append worktree agents
+	// Only worktree agents
 	for _, wa := range m.WorktreeAgents {
 		if len(wa.Sessions) > 0 {
 			visible = append(visible, wa)
@@ -293,22 +281,6 @@ func NewModel(database *db.DB, mem0Enabled bool) (*Model, error) {
 		return worktreeAgents[i].Name < worktreeAgents[j].Name
 	})
 
-	// Initialize agent sessions map
-	agentSessions := make(map[AgentType][]db.Session)
-	for _, a := range AllAgents {
-		if a.Load != nil {
-			sessions, _ := a.Load(home)
-			if sessions == nil {
-				sessions = []db.Session{}
-			}
-			agentSessions[a.Type] = sessions
-		} else {
-			agentSessions[a.Type] = []db.Session{}
-		}
-	}
-	// Antigravity uses AGY sessions
-	agentSessions[AgentAntigravity] = agySessions
-
 	fi := textinput.New()
 	fi.Placeholder = "filter sessions..."
 	fi.CharLimit = 100
@@ -320,17 +292,16 @@ func NewModel(database *db.DB, mem0Enabled bool) (*Model, error) {
 	ri.Width = 60
 
 	m := &Model{
-		DB:               database,
-		AgentSessions:    agentSessions,
-		WorktreeAgents:   worktreeAgents,
-		Cursor:           0,
-		Mode:             ModeBrowse,
-		SortMode:         SortTimeDesc,
-		FilterInput:      fi,
-		RenameInput:      ri,
-		Mem0Enabled:      mem0Enabled,
-		AGYDBPath:        agyDBPath,
-		AGYHistoryPath:   agyHistoryPath,
+		DB:             database,
+		WorktreeAgents: worktreeAgents,
+		Cursor:         0,
+		Mode:           ModeBrowse,
+		SortMode:       SortTimeDesc,
+		FilterInput:    fi,
+		RenameInput:    ri,
+		Mem0Enabled:    mem0Enabled,
+		AGYDBPath:      agyDBPath,
+		AGYHistoryPath: agyHistoryPath,
 	}
 	m.SortSessions()
 	return m, nil
